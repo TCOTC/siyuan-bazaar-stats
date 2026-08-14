@@ -3,6 +3,7 @@ import { parseBazaarIndex } from './parse-index.ts'
 import { buildPackageRating, statsEqual } from './rating.ts'
 import { applySnapshot, diffStats, reconstructHistories } from './history.ts'
 import { unescapeHtml } from './locale.ts'
+import { parseStageUpdated, parseBazaarHash } from './catalog-view.ts'
 import { isValidPackageName } from './names.ts'
 
 describe('parseBazaarIndex', () => {
@@ -79,6 +80,22 @@ describe('isValidPackageName', () => {
 describe('unescapeHtml', () => {
   it('restores ampersands from stage HTML entities', () => {
     expect(unescapeHtml('霞鹜文楷 &amp; Twemoji')).toBe('霞鹜文楷 & Twemoji')
+  })
+})
+
+describe('parseStageUpdated', () => {
+  it('parses bazaar stage ISO timestamps', () => {
+    expect(parseStageUpdated('2026-08-14T10:33:28Z')).toBe(Math.floor(Date.parse('2026-08-14T10:33:28Z') / 1000))
+    expect(parseStageUpdated('')).toBeUndefined()
+  })
+})
+
+describe('parseBazaarHash', () => {
+  it('reads the rhy bazaar field', () => {
+    expect(parseBazaarHash({ bazaar: 'f631b50cd02a1d7674bb78bb2563a96dd4d8fdb5' })).toBe(
+      'f631b50cd02a1d7674bb78bb2563a96dd4d8fdb5',
+    )
+    expect(() => parseBazaarHash({})).toThrow(/bazaar hash/)
   })
 })
 

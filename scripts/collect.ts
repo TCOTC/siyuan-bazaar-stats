@@ -16,7 +16,7 @@ export async function collect(now = Date.now()): Promise<{ changed: boolean, sna
   const changes = full ? nextStats : diffStats(previous?.packages ?? {}, nextStats)
 
   const catalogPrevious = await readJson<Catalog>(path.join(DATA_DIR, 'catalog.json'))
-  const catalog = await loadCatalog(Math.floor(now / 1000), catalogPrevious, Object.keys(index.packages))
+  const catalog = await loadCatalog(Math.floor(now / 1000), catalogPrevious)
   const catalogChanged = JSON.stringify(catalog.packages) !== JSON.stringify(catalogPrevious?.packages ?? {})
   if (catalogChanged || !catalogPrevious) {
     await writeJson(path.join(DATA_DIR, 'catalog.json'), catalog)

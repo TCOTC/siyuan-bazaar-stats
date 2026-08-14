@@ -56,6 +56,7 @@ export type CatalogPackage = {
   author: string
   displayName: LocaleStrings
   description: LocaleStrings
+  updatedAt?: number
 }
 
 export type Catalog = {
@@ -77,6 +78,7 @@ export type SummaryPackage = {
   ratingCountDelta24h: number
   sparklineDownloads: number[]
   sparklineAverage: number[]
+  updatedAt: number
 }
 
 export type SiteSummary = {
@@ -104,6 +106,7 @@ export type PackageDetail = {
   displayName: string
   description: string
   iconURL?: string
+  updatedAt?: number
   current: PackageStats
   history: PackageHistoryPoint[]
 }

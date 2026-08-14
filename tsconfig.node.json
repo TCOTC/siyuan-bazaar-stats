@@ -17,5 +17,6 @@
     "noFallthroughCasesInSwitch": true,
     "types": ["node", "vitest/config"]
   },
-  "include": ["vite.config.ts", "scripts/**/*.ts", "src/lib/**/*.ts"]
+  "include": ["vite.config.ts", "scripts/**/*.ts", "src/lib/**/*.ts"],
+  "exclude": ["src/lib/theme.ts", "src/lib/highcharts.ts", "src/**/*.test.ts"]
 }

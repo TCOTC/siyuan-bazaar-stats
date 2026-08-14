@@ -54,6 +54,7 @@ export async function buildSiteData(): Promise<void> {
       displayName: pkg.displayName,
       description: pkg.description,
       ...(pkg.iconURL ? { iconURL: pkg.iconURL } : {}),
+      ...(pkg.updatedAt ? { updatedAt: pkg.updatedAt } : {}),
       current: last ? cloneStats(last) : { d: pkg.downloads },
       history: histories[pkg.name] ?? [],
     }
@@ -118,6 +119,7 @@ function toSummary(
     ratingCountDelta24h: (stats.c ?? 0) - (baseline?.c ?? stats.c ?? 0),
     sparklineDownloads: sparkline(history, (point) => point.d),
     sparklineAverage: sparkline(history.filter((point) => point.a !== undefined), (point) => point.a ?? 0),
+    updatedAt: meta?.updatedAt ?? 0,
   }
 }
 
@@ -148,17 +150,16 @@ function sparkline(history: PackageHistoryPoint[], value: (point: PackageHistory
 }
 
 function compareSummary(left: SummaryPackage, right: SummaryPackage): number {
-  const rightCount = right.rating?.count ?? 0
-  const leftCount = left.rating?.count ?? 0
-  if (rightCount !== leftCount) {
-    return rightCount - leftCount
+  if (left.updatedAt === 0 && right.updatedAt === 0) {
+    return right.downloads - left.downloads
   }
-  const rightAvg = right.rating?.average ?? 0
-  const leftAvg = left.rating?.average ?? 0
-  if (rightAvg !== leftAvg) {
-    return rightAvg - leftAvg
+  if (left.updatedAt === 0) {
+    return 1
   }
-  return right.downloads - left.downloads
+  if (right.updatedAt === 0) {
+    return -1
+  }
+  return right.updatedAt - left.updatedAt || right.downloads - left.downloads
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

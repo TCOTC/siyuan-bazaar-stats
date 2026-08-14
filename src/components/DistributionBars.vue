@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { STAR_COLORS } from '../lib/colors.ts'
 import { formatNumber } from '../lib/format.ts'
 import type { RatingDistribution } from '../lib/types.ts'
 
@@ -8,24 +9,29 @@ const props = defineProps<{
 }>()
 
 const total = computed(() => props.distribution.reduce((sum, value) => sum + value, 0))
-const rows = computed(() => [5, 4, 3, 2, 1].map((star) => {
+const bars = computed(() => [1, 2, 3, 4, 5].map((star) => {
   const count = props.distribution[star - 1] ?? 0
+  const ratio = total.value > 0 ? count / total.value : 0
   return {
     star,
     count,
-    ratio: total.value > 0 ? count / total.value : 0,
+    color: STAR_COLORS[star - 1],
+    height: count === 0 ? '0.2rem' : `${Math.max(12, ratio * 100)}%`,
   }
 }))
 </script>
 
 <template>
-  <ul class="dist-bars">
-    <li v-for="row in rows" :key="row.star" class="dist-row">
-      <span class="dist-label">{{ row.star }} 星</span>
-      <span class="dist-track">
-        <span class="dist-fill" :class="`star-${row.star}`" :style="{ width: `${row.ratio * 100}%` }" />
-      </span>
-      <span class="dist-count">{{ formatNumber(row.count) }}</span>
-    </li>
-  </ul>
+  <div class="score-bars">
+    <div
+      v-for="bar in bars"
+      :key="bar.star"
+      class="score-bar"
+      :style="{ '--bar-color': bar.color, '--bar-height': bar.height }"
+    >
+      <span />
+      <small>{{ bar.star }} 星</small>
+      <em>{{ formatNumber(bar.count) }}</em>
+    </div>
+  </div>
 </template>

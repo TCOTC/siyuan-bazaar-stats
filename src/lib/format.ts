@@ -13,7 +13,7 @@ export function formatNumber(value: number): string {
 }
 
 export function formatAverage(value: number): string {
-  return value.toLocaleString('zh-CN', { minimumFractionDigits: 1, maximumFractionDigits: 2 })
+  return value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 export function formatDateTime(unix: number): string {
@@ -30,6 +30,7 @@ export function formatDateTime(unix: number): string {
 export function formatDate(unix: number): string {
   return new Date(unix * 1000).toLocaleDateString('zh-CN', {
     timeZone: 'Asia/Shanghai',
+    year: 'numeric',
     month: '2-digit',
     day: '2-digit',
   })
@@ -37,12 +38,16 @@ export function formatDate(unix: number): string {
 
 export function formatDelta(value: number): string {
   if (value > 0) {
-    return `+${formatNumber(value)}`
+    return `▴ ${formatNumber(value)}`
   }
   if (value < 0) {
-    return formatNumber(value)
+    return `▾ ${formatNumber(Math.abs(value))}`
   }
-  return '0'
+  return '–'
+}
+
+export function formatRank(index: number): string {
+  return String(index + 1).padStart(3, '0')
 }
 
 export function githubRepoURL(repo: string): string {

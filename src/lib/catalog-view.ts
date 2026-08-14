@@ -16,3 +16,25 @@ export function catalogIconURL(pkg: CatalogPackage | undefined): string | undefi
   }
   return undefined
 }
+
+export function parseStageUpdated(value: unknown): number | undefined {
+  if (typeof value !== 'string' || !value.trim()) {
+    return undefined
+  }
+  const ms = Date.parse(value)
+  if (!Number.isFinite(ms)) {
+    return undefined
+  }
+  return Math.floor(ms / 1000)
+}
+
+export function parseBazaarHash(raw: unknown): string {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new Error('invalid rhy version')
+  }
+  const bazaar = (raw as { bazaar?: unknown }).bazaar
+  if (typeof bazaar !== 'string' || !/^[a-f0-9]{7,40}$/i.test(bazaar)) {
+    throw new Error('invalid rhy bazaar hash')
+  }
+  return bazaar
+}

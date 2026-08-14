@@ -4,7 +4,8 @@ import { RouterLink } from 'vue-router'
 import DistributionBars from '../components/DistributionBars.vue'
 import StarRating from '../components/StarRating.vue'
 import TrendChart from '../components/TrendChart.vue'
-import { formatAverage, formatDateTime, formatNumber, githubRepoURL, TYPE_LABELS } from '../lib/format.ts'
+import { GOLD, PINK, STAR_COLORS, TEAL } from '../lib/colors.ts'
+import { formatAverage, formatDate, formatDateTime, formatNumber, githubRepoURL, TYPE_LABELS } from '../lib/format.ts'
 import { ratingFromStats } from '../lib/rating.ts'
 import type { PackageDetail } from '../lib/types.ts'
 
@@ -35,7 +36,7 @@ const ratingHistory = computed(() => detail.value?.history.filter((point) => poi
 const ratingTimes = computed(() => ratingHistory.value.map((point) => point.t))
 const distributionSeries = computed(() => [1, 2, 3, 4, 5].map((star) => ({
   label: `${star} 星`,
-  color: ['#b45309', '#c4a35a', '#d4b96a', '#7c9a6d', '#3f6b4a'][star - 1]!,
+  color: STAR_COLORS[star - 1]!,
   values: ratingHistory.value.map((point) => point.x?.[star - 1] ?? 0),
 })))
 </script>
@@ -48,45 +49,46 @@ const distributionSeries = computed(() => [1, 2, 3, 4, 5].map((star) => ({
   <section v-else-if="!detail" class="notice">正在加载 {{ name }}…</section>
   <template v-else>
     <section class="pkg-hero">
-      <img
-        v-if="detail.iconURL"
-        class="pkg-icon"
-        :src="detail.iconURL"
-        :alt="detail.displayName"
-        width="72"
-        height="72"
-        loading="lazy"
-        decoding="async"
-      />
-      <div>
-        <p class="eyebrow">{{ detail.type ? TYPE_LABELS[detail.type] : '集市包' }}</p>
-        <h1>{{ detail.displayName }}</h1>
-        <p class="muted">{{ detail.name }} · {{ detail.author || '未知作者' }}</p>
-        <p v-if="detail.description">{{ detail.description }}</p>
-        <p v-if="detail.repo">
-          <a :href="githubRepoURL(detail.repo)" target="_blank" rel="noreferrer">{{ detail.repo }}</a>
-        </p>
+      <p class="kicker">{{ detail.type ? TYPE_LABELS[detail.type] : '集市包' }}</p>
+      <div class="pkg-heading">
+        <img
+          v-if="detail.iconURL"
+          class="pkg-icon"
+          :src="detail.iconURL"
+          :alt="detail.displayName"
+          width="56"
+          height="56"
+          loading="lazy"
+          decoding="async"
+        />
+        <div class="pkg-heading-text">
+          <h1>{{ detail.displayName }}</h1>
+          <p class="muted">{{ detail.name }} · {{ detail.author || '未知作者' }}<template v-if="detail.updatedAt"> · {{ formatDate(detail.updatedAt) }} 更新</template></p>
+        </div>
       </div>
+      <p v-if="detail.description">{{ detail.description }}</p>
+      <p v-if="detail.repo" class="pkg-repo">
+        <a :href="githubRepoURL(detail.repo)" target="_blank" rel="noreferrer">{{ detail.repo }}</a>
+      </p>
     </section>
 
-    <section class="stats-grid">
-      <article>
+    <section class="meter-strip">
+      <article class="metric-cell">
         <small>均分</small>
-        <strong v-if="rating">
-          {{ formatAverage(rating.average) }}
-          <StarRating :value="rating.average" :size="18" />
-        </strong>
-        <strong v-else>—</strong>
+        <div class="metric-main">
+          <strong>{{ rating ? formatAverage(rating.average) : '—' }}</strong>
+          <StarRating v-if="rating" :value="rating.average" :size="18" />
+        </div>
       </article>
-      <article>
+      <article class="metric-cell">
         <small>评分人数</small>
         <strong>{{ formatNumber(rating?.count ?? 0) }}</strong>
       </article>
-      <article>
+      <article class="metric-cell">
         <small>下载量</small>
         <strong>{{ formatNumber(detail.current.d) }}</strong>
       </article>
-      <article>
+      <article class="metric-cell">
         <small>最近快照</small>
         <strong class="time">{{ detail.history.at(-1) ? formatDateTime(detail.history.at(-1)!.t) : '—' }}</strong>
       </article>
@@ -102,14 +104,14 @@ const distributionSeries = computed(() => [1, 2, 3, 4, 5].map((star) => ({
       <TrendChart
         title="平均分"
         :times="ratingTimes"
-        :series="[{ label: '均分', color: '#c4a35a', values: ratingHistory.map((point) => point.a ?? 0) }]"
+        :series="[{ label: '均分', color: TEAL, values: ratingHistory.map((point) => point.a ?? 0) }]"
         :format-y="(value) => value.toFixed(1)"
         :y-max="5"
       />
       <TrendChart
         title="评分人数"
         :times="ratingTimes"
-        :series="[{ label: '人数', color: '#3f6b4a', values: ratingHistory.map((point) => point.c ?? 0) }]"
+        :series="[{ label: '人数', color: PINK, values: ratingHistory.map((point) => point.c ?? 0) }]"
         :format-y="formatNumber"
       />
       <TrendChart
@@ -124,7 +126,7 @@ const distributionSeries = computed(() => [1, 2, 3, 4, 5].map((star) => ({
     <TrendChart
       title="下载量"
       :times="times"
-      :series="[{ label: '下载', color: '#1c1917', values: detail.history.map((point) => point.d) }]"
+      :series="[{ label: '下载', color: GOLD, values: detail.history.map((point) => point.d) }]"
       :format-y="formatNumber"
     />
   </template>

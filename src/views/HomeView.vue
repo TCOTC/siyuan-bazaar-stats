@@ -3,16 +3,17 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import Sparkline from '../components/Sparkline.vue'
 import StarRating from '../components/StarRating.vue'
+import { GOLD, PINK, TEAL } from '../lib/colors.ts'
+import { formatAverage, formatDate, formatDateTime, formatDelta, formatNumber, formatRank, githubRepoURL, TYPE_LABELS } from '../lib/format.ts'
 import { PACKAGE_TYPES } from '../lib/types.ts'
 import type { PackageType, SiteSummary, SummaryPackage } from '../lib/types.ts'
-import { formatAverage, formatDateTime, formatDelta, formatNumber, TYPE_LABELS } from '../lib/format.ts'
 
 const summary = ref<SiteSummary>()
 const error = ref('')
 const query = ref('')
 const typeFilter = ref<PackageType | 'all'>('all')
 const ratedOnly = ref(false)
-const sortKey = ref<'rating' | 'count' | 'downloads' | 'delta' | 'name'>('count')
+const sortKey = ref<'updated' | 'rating' | 'count' | 'downloads' | 'delta' | 'name'>('updated')
 
 onMounted(async () => {
   try {
@@ -49,6 +50,9 @@ function comparePackages(left: SummaryPackage, right: SummaryPackage): number {
     case 'rating':
       return (right.rating?.average ?? -1) - (left.rating?.average ?? -1) ||
         (right.rating?.count ?? 0) - (left.rating?.count ?? 0)
+    case 'count':
+      return (right.rating?.count ?? 0) - (left.rating?.count ?? 0) ||
+        (right.rating?.average ?? 0) - (left.rating?.average ?? 0)
     case 'downloads':
       return right.downloads - left.downloads
     case 'delta':
@@ -56,8 +60,16 @@ function comparePackages(left: SummaryPackage, right: SummaryPackage): number {
     case 'name':
       return left.displayName.localeCompare(right.displayName, 'zh-CN')
     default:
-      return (right.rating?.count ?? 0) - (left.rating?.count ?? 0) ||
-        (right.rating?.average ?? 0) - (left.rating?.average ?? 0)
+      if (!left.updatedAt && !right.updatedAt) {
+        return right.downloads - left.downloads
+      }
+      if (!left.updatedAt) {
+        return 1
+      }
+      if (!right.updatedAt) {
+        return -1
+      }
+      return right.updatedAt - left.updatedAt || right.downloads - left.downloads
   }
 }
 </script>
@@ -66,20 +78,20 @@ function comparePackages(left: SummaryPackage, right: SummaryPackage): number {
   <section v-if="error" class="notice">无法加载统计数据：{{ error }}</section>
   <section v-else-if="!summary" class="notice">正在加载集市快照…</section>
   <template v-else>
-    <section class="stats-grid">
-      <article>
+    <section class="meter-strip">
+      <article class="metric-cell">
         <small>集市包</small>
         <strong>{{ formatNumber(summary.totals.packages) }}</strong>
       </article>
-      <article>
+      <article class="metric-cell">
         <small>有评分</small>
         <strong>{{ formatNumber(summary.totals.rated) }}</strong>
       </article>
-      <article>
+      <article class="metric-cell">
         <small>评分人次</small>
         <strong>{{ formatNumber(summary.totals.ratings) }}</strong>
       </article>
-      <article>
+      <article class="metric-cell">
         <small>总下载</small>
         <strong>{{ formatNumber(summary.totals.downloads) }}</strong>
       </article>
@@ -93,6 +105,7 @@ function comparePackages(left: SummaryPackage, right: SummaryPackage): number {
         <option v-for="type in PACKAGE_TYPES" :key="type" :value="type">{{ TYPE_LABELS[type] }}</option>
       </select>
       <select v-model="sortKey">
+        <option value="updated">按更新时间</option>
         <option value="count">按评分数</option>
         <option value="rating">按均分</option>
         <option value="downloads">按下载量</option>
@@ -106,60 +119,62 @@ function comparePackages(left: SummaryPackage, right: SummaryPackage): number {
     </section>
 
     <p class="result-count">{{ formatNumber(filtered.length) }} 个包</p>
-    <div class="table-wrap">
-      <table class="pkg-table">
-        <thead>
-          <tr>
-            <th>包</th>
-            <th>类型</th>
-            <th>评分</th>
-            <th>下载</th>
-            <th>近 24 小时下载</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="pkg in filtered" :key="pkg.name">
-            <td>
-              <RouterLink class="pkg-link" :to="{ name: 'package', params: { name: pkg.name } }">
-                <img
-                  v-if="pkg.iconURL"
-                  :src="pkg.iconURL"
-                  :alt="pkg.displayName"
-                  width="28"
-                  height="28"
-                  loading="lazy"
-                  decoding="async"
-                />
-                <span>
-                  <strong>{{ pkg.displayName }}</strong>
-                  <small>{{ pkg.name }}</small>
-                </span>
-              </RouterLink>
-            </td>
-            <td>{{ pkg.type ? TYPE_LABELS[pkg.type] : '—' }}</td>
-            <td>
-              <template v-if="pkg.rating">
-                <StarRating :value="pkg.rating.average" />
-                <span class="muted">
-                  {{ formatAverage(pkg.rating.average) }} · {{ formatNumber(pkg.rating.count) }} 人
-                  <template v-if="pkg.ratingCountDelta24h">
-                    · {{ formatDelta(pkg.ratingCountDelta24h) }}
-                  </template>
-                </span>
-                <Sparkline :values="pkg.sparklineAverage" color="var(--gold)" />
+    <ol class="ranking">
+      <li v-for="(pkg, index) in filtered" :key="pkg.name">
+        <span class="rank-index">{{ formatRank(index) }}</span>
+        <div class="pkg-identity">
+          <img
+            v-if="pkg.iconURL"
+            :src="pkg.iconURL"
+            :alt="pkg.displayName"
+            width="36"
+            height="36"
+            loading="lazy"
+            decoding="async"
+          />
+          <span class="pkg-copy">
+            <RouterLink class="pkg-name" :to="{ name: 'package', params: { name: pkg.name } }">{{ pkg.displayName }}</RouterLink>
+            <small>
+              {{ pkg.type ? TYPE_LABELS[pkg.type] : '集市包' }}
+              <template v-if="pkg.repo">
+                ·
+                <a
+                  class="repo-link"
+                  :href="githubRepoURL(pkg.repo)"
+                  target="_blank"
+                  rel="noreferrer"
+                >{{ pkg.repo }}</a>
               </template>
-              <span v-else class="muted">暂无</span>
-            </td>
-            <td>
-              <span class="metric-value">{{ formatNumber(pkg.downloads) }}</span>
-              <Sparkline :values="pkg.sparklineDownloads" />
-            </td>
-            <td :class="{ up: pkg.downloadDelta24h > 0, down: pkg.downloadDelta24h < 0 }">
-              {{ formatDelta(pkg.downloadDelta24h) }}
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+              <template v-else> · {{ pkg.name }}</template>
+              <template v-if="pkg.updatedAt"> · {{ formatDate(pkg.updatedAt) }}</template>
+            </small>
+          </span>
+        </div>
+        <div class="rank-metric">
+          <template v-if="pkg.rating">
+            <span class="metric-head">
+              <span class="metric-value">{{ formatAverage(pkg.rating.average) }}</span>
+              <StarRating :value="pkg.rating.average" />
+            </span>
+            <span class="muted">
+              {{ formatNumber(pkg.rating.count) }} 人
+              <template v-if="pkg.ratingCountDelta24h"> · {{ formatDelta(pkg.ratingCountDelta24h) }}</template>
+            </span>
+            <Sparkline :values="pkg.sparklineAverage" :color="GOLD" />
+          </template>
+          <span v-else class="muted">暂无评分</span>
+        </div>
+        <div class="rank-metric">
+          <span class="metric-head">
+            <span class="metric-value">{{ formatNumber(pkg.downloads) }}</span>
+          </span>
+          <span
+            class="muted"
+            :class="{ up: pkg.downloadDelta24h > 0, down: pkg.downloadDelta24h < 0 }"
+          >{{ formatDelta(pkg.downloadDelta24h) }}</span>
+          <Sparkline :values="pkg.sparklineDownloads" :color="pkg.downloadDelta24h < 0 ? PINK : TEAL" />
+        </div>
+      </li>
+    </ol>
   </template>
 </template>

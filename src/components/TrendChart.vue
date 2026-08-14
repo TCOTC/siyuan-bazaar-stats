@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { formatDate, formatDateTime } from '../lib/format.ts'
+import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import type { Chart, Options, SeriesOptionsType } from 'highcharts'
+import Highcharts from '../lib/highcharts.ts'
 
 export type ChartSeries = {
   label: string
@@ -17,211 +18,107 @@ const props = defineProps<{
   formatY?: (value: number) => string
 }>()
 
-const width = 720
-const height = 260
-const pad = { top: 16, right: 16, bottom: 36, left: 52 }
-const hover = ref<number | null>(null)
+const el = ref<HTMLElement>()
+let chart: Chart | undefined
 
-const plotWidth = width - pad.left - pad.right
-const plotHeight = height - pad.top - pad.bottom
-
-const stackedValues = computed(() => {
-  if (!props.stacked) {
-    return props.series.map((item) => item.values)
-  }
-  const totals: number[][] = []
-  let previous = Array.from({ length: props.times.length }, () => 0)
-  for (const item of props.series) {
-    const layer = item.values.map((value, index) => previous[index]! + value)
-    totals.push(layer)
-    previous = layer
-  }
-  return totals
-})
-
-const yMax = computed(() => {
-  if (props.yMax !== undefined) {
-    return props.yMax
-  }
-  const values = stackedValues.value.flat()
-  const max = Math.max(0, ...values)
-  if (max <= 1) {
-    return 5
-  }
-  const magnitude = 10 ** Math.floor(Math.log10(max))
-  return Math.ceil(max / magnitude) * magnitude
-})
-
-function xOf(index: number): number {
-  if (props.times.length <= 1) {
-    return pad.left + plotWidth / 2
-  }
-  const start = props.times[0]!
-  const end = props.times.at(-1)!
-  const span = end - start
-  if (span <= 0) {
-    return pad.left + plotWidth / 2
-  }
-  return pad.left + (props.times[index]! - start) / span * plotWidth
+function seriesOptions(): SeriesOptionsType[] {
+  return props.series.map((item) => ({
+    type: props.stacked ? 'area' : 'spline',
+    name: item.label,
+    color: item.color,
+    data: item.values.map((value, index) => [props.times[index]! * 1000, value]),
+  }))
 }
 
-function yOf(value: number): number {
-  return pad.top + plotHeight - (value / (yMax.value || 1)) * plotHeight
-}
-
-const yTicks = computed(() => {
-  const ticks = 4
-  return Array.from({ length: ticks + 1 }, (_, index) => yMax.value * index / ticks)
-})
-
-const xTicks = computed(() => {
-  if (props.times.length === 0) {
-    return []
-  }
-  const count = Math.min(6, props.times.length)
-  return Array.from({ length: count }, (_, index) => {
-    const i = Math.round(index * (props.times.length - 1) / Math.max(1, count - 1))
-    return { index: i, time: props.times[i]! }
-  })
-})
-
-function areaPath(top: number[], bottom: number[]): string {
-  if (top.length === 0) {
-    return ''
-  }
-  const forward = top.map((value, index) => `${index === 0 ? 'M' : 'L'}${xOf(index)} ${yOf(value)}`).join(' ')
-  const backward = [...bottom].reverse().map((value, index) => {
-    const sourceIndex = bottom.length - 1 - index
-    return `L${xOf(sourceIndex)} ${yOf(value)}`
-  }).join(' ')
-  return `${forward} ${backward} Z`
-}
-
-function linePath(values: number[]): string {
-  return values.map((value, index) => `${index === 0 ? 'M' : 'L'}${xOf(index)} ${yOf(value)}`).join(' ')
-}
-
-function onMove(event: MouseEvent) {
-  const svg = event.currentTarget as SVGSVGElement
-  const rect = svg.getBoundingClientRect()
-  const svgX = (event.clientX - rect.left) / rect.width * width
-  let nearest = 0
-  let best = Infinity
-  for (let i = 0; i < props.times.length; i++) {
-    const distance = Math.abs(xOf(i) - svgX)
-    if (distance < best) {
-      best = distance
-      nearest = i
-    }
-  }
-  hover.value = nearest
-}
-
-const tooltip = computed(() => {
-  if (hover.value === null || !props.times[hover.value]) {
-    return undefined
-  }
-  const index = hover.value
+function buildOptions(): Options {
+  const dark = document.documentElement.classList.contains('dark')
+  const fg = dark ? '#ffffff' : '#171717'
+  const muted = dark ? '#d4d4d4' : '#737373'
+  const grid = dark ? '#404040' : '#e6e6e6'
+  const formatY = props.formatY
   return {
-    x: Math.min(width - 180, Math.max(pad.left, xOf(index) + 8)),
-    y: pad.top + 8,
-    time: props.times[index]!,
-    rows: props.series.map((item) => ({
-      label: item.label,
-      color: item.color,
-      value: item.values[index] ?? 0,
-    })),
+    chart: {
+      zooming: { type: 'x' },
+      height: 320,
+    },
+    legend: {
+      enabled: props.series.length > 1,
+      itemStyle: { color: fg, fontWeight: 'normal' },
+      itemHoverStyle: { color: fg },
+    },
+    xAxis: {
+      type: 'datetime',
+      lineColor: grid,
+      tickColor: grid,
+      labels: { style: { color: muted } },
+      crosshair: true,
+    },
+    yAxis: {
+      title: { text: undefined },
+      max: props.yMax,
+      min: props.yMax === undefined ? undefined : 0,
+      gridLineColor: grid,
+      labels: {
+        style: { color: muted },
+        formatter() {
+          const value = typeof this.value === 'number' ? this.value : Number(this.value)
+          return formatY?.(value) ?? String(this.value)
+        },
+      },
+    },
+    tooltip: {
+      shared: true,
+    },
+    plotOptions: {
+      area: {
+        stacking: 'normal',
+        lineWidth: 0,
+        marker: { enabled: false },
+        fillOpacity: 0.85,
+      },
+      spline: {
+        marker: { radius: 3, symbol: 'circle' },
+      },
+    },
+    series: seriesOptions(),
   }
+}
+
+function render() {
+  if (!el.value || props.times.length < 2) {
+    chart?.destroy()
+    chart = undefined
+    return
+  }
+  if (chart) {
+    chart.update(buildOptions(), true, true)
+    return
+  }
+  chart = Highcharts.chart(el.value, buildOptions())
+}
+
+onMounted(() => {
+  render()
+  window.addEventListener('themechange', render)
 })
 
-const formatY = (value: number) => props.formatY?.(value) ?? String(value)
+onUnmounted(() => {
+  window.removeEventListener('themechange', render)
+  chart?.destroy()
+  chart = undefined
+})
+
+watch(
+  () => [props.times, props.series, props.stacked, props.yMax] as const,
+  () => nextTick(render),
+  { deep: true },
+)
 </script>
 
 <template>
   <section class="chart-card">
     <h3>{{ title }}</h3>
     <p v-if="times.length < 2" class="chart-empty">采集点还不够，稍后即可看到趋势。</p>
-    <svg
-      v-else
-      class="chart"
-      :viewBox="`0 0 ${width} ${height}`"
-      role="img"
-      :aria-label="title"
-      @mousemove="onMove"
-      @mouseleave="hover = null"
-    >
-      <line
-        v-for="tick in yTicks"
-        :key="tick"
-        :x1="pad.left"
-        :x2="width - pad.right"
-        :y1="yOf(tick)"
-        :y2="yOf(tick)"
-        class="chart-grid"
-      />
-      <text
-        v-for="tick in yTicks"
-        :key="`y-${tick}`"
-        :x="pad.left - 8"
-        :y="yOf(tick) + 4"
-        class="chart-axis"
-        text-anchor="end"
-      >{{ formatY(tick) }}</text>
-      <text
-        v-for="tick in xTicks"
-        :key="`x-${tick.index}`"
-        :x="xOf(tick.index)"
-        :y="height - 10"
-        class="chart-axis"
-        text-anchor="middle"
-      >{{ formatDate(tick.time) }}</text>
-      <template v-if="stacked">
-        <path
-          v-for="(item, index) in [...series].reverse()"
-          :key="item.label"
-          :d="areaPath(
-            stackedValues[series.length - 1 - index] ?? [],
-            stackedValues[series.length - 2 - index] ?? Array.from({ length: times.length }, () => 0),
-          )"
-          :fill="item.color"
-          fill-opacity="0.85"
-        />
-      </template>
-      <template v-else>
-        <path
-          v-for="item in series"
-          :key="item.label"
-          :d="linePath(item.values)"
-          fill="none"
-          :stroke="item.color"
-          stroke-width="2"
-          stroke-linejoin="round"
-          stroke-linecap="round"
-        />
-      </template>
-      <line
-        v-if="hover !== null"
-        :x1="xOf(hover)"
-        :x2="xOf(hover)"
-        :y1="pad.top"
-        :y2="height - pad.bottom"
-        class="chart-hover"
-      />
-      <foreignObject
-        v-if="tooltip"
-        :x="tooltip.x"
-        :y="tooltip.y"
-        width="170"
-        height="160"
-      >
-        <div class="chart-tooltip">
-          <strong>{{ formatDateTime(tooltip.time) }}</strong>
-          <p v-for="row in tooltip.rows" :key="row.label">
-            <i :style="{ background: row.color }" />
-            {{ row.label }} {{ formatY(row.value) }}
-          </p>
-        </div>
-      </foreignObject>
-    </svg>
+    <div v-show="times.length >= 2" ref="el" class="chart-host" />
   </section>
 </template>

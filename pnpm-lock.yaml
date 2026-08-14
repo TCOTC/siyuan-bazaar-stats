@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      highcharts:
+        specifier: ^13.0.0
+        version: 13.0.0
       vue:
         specifier: ^3.5.22
         version: 3.5.41(typescript@5.9.2)
@@ -943,6 +946,17 @@ packages:
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
     os: [darwin]
 
+  highcharts@13.0.0:
+    resolution: {integrity: sha512-AoFXei9hSnVXo8X5PmXzSiNXwPMgA+NzyN35uRRy0N1XwbJbRI1laTCaaFci9QB9Wyv9ZFWlgF0xzgivavJpDA==}
+    peerDependencies:
+      jspdf: ^4.1.0
+      svg2pdf.js: ^2.7.0
+    peerDependenciesMeta:
+      jspdf:
+        optional: true
+      svg2pdf.js:
+        optional: true
+
   js-tokens@9.0.1:
     resolution: {integrity: sha512-mxa9E9ITFOt0ban3j6L5MpjwegGz6lBQmM1IJkWeBZGcMxto50+eWdjC/52xDbS2vy0k7vIMK0Fe2wfL9OQSpQ==}
 
@@ -1875,6 +1889,8 @@ snapshots:
 
   fsevents@2.3.3:
     optional: true
+
+  highcharts@13.0.0: {}
 
   js-tokens@9.0.1: {}
 

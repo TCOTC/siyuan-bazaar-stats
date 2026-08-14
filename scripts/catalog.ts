@@ -1,11 +1,12 @@
 import { unescapeHtml } from '../src/lib/locale.ts'
-import { BAZAAR_STAGE_BASE, USER_AGENT } from '../src/lib/constants.ts'
-import { utcDay } from '../src/lib/history.ts'
+import { parseBazaarHash, parseStageUpdated } from '../src/lib/catalog-view.ts'
+import { bazaarStageURL, RHY_VERSION_URL, USER_AGENT } from '../src/lib/constants.ts'
 import { isValidBazaarRepo, isValidPackageName } from '../src/lib/names.ts'
 import { PACKAGE_TYPES, type Catalog, type CatalogPackage, type LocaleStrings, type PackageType } from '../src/lib/types.ts'
 
 type StageRepo = {
   url?: unknown
+  updated?: unknown
   package?: {
     name?: unknown
     author?: unknown
@@ -21,19 +22,23 @@ type StageIndex = {
 export async function loadCatalog(
   now: number,
   previous: Catalog | undefined,
-  packageNames: string[],
 ): Promise<Catalog> {
-  const missing = packageNames.some((name) => !previous?.packages[name])
-  const stale = !previous || utcDay(previous.updatedAt) !== utcDay(now)
-  if (previous && !missing && !stale) {
-    return previous
+  let hash: string
+  try {
+    hash = await fetchBazaarHash()
+  } catch (error) {
+    console.warn('fetch bazaar hash failed:', error)
+    if (previous) {
+      return previous
+    }
+    throw error
   }
 
   const packages: Record<string, CatalogPackage> = { ...(previous?.packages ?? {}) }
   let failed = 0
   for (const type of PACKAGE_TYPES) {
     try {
-      mergeStage(packages, type, await fetchStage(type))
+      mergeStage(packages, type, await fetchStageJSON(bazaarStageURL(hash, type)))
     } catch (error) {
       failed += 1
       console.warn(`fetch stage ${type} failed:`, error)
@@ -48,12 +53,22 @@ export async function loadCatalog(
   }
 }
 
-async function fetchStage(type: PackageType): Promise<StageIndex> {
-  const response = await fetch(`${BAZAAR_STAGE_BASE}/${type}.json`, {
+async function fetchBazaarHash(): Promise<string> {
+  const response = await fetch(RHY_VERSION_URL, {
     headers: { 'User-Agent': USER_AGENT },
   })
   if (!response.ok) {
-    throw new Error(`stage ${type} HTTP ${response.status}`)
+    throw new Error(`rhy version HTTP ${response.status}`)
+  }
+  return parseBazaarHash(await response.json())
+}
+
+async function fetchStageJSON(url: string): Promise<StageIndex> {
+  const response = await fetch(url, {
+    headers: { 'User-Agent': USER_AGENT },
+  })
+  if (!response.ok) {
+    throw new Error(`stage ${url} HTTP ${response.status}`)
   }
   return await response.json() as StageIndex
 }
@@ -76,6 +91,7 @@ function mergeStage(
     if (!repoName || !isValidBazaarRepo(repoName)) {
       continue
     }
+    const updatedAt = parseStageUpdated(repo.updated)
     packages[pkg.name] = {
       type,
       repo: repoName,
@@ -83,6 +99,7 @@ function mergeStage(
       author: typeof pkg.author === 'string' ? unescapeHtml(pkg.author) : '',
       displayName: asLocaleStrings(pkg.displayName),
       description: asLocaleStrings(pkg.description),
+      ...(updatedAt ? { updatedAt } : {}),
     }
   }
 }

@@ -37,7 +37,7 @@ const points = computed(() => {
     <polyline
       fill="none"
       :stroke="color ?? 'currentColor'"
-      stroke-width="1.5"
+      stroke-width="2"
       stroke-linejoin="round"
       stroke-linecap="round"
       :points="points"

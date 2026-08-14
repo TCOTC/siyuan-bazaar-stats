@@ -1,0 +1,95 @@
+name: Collect and deploy
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'data/**'
+
+concurrency:
+  group: collect-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+  deployments: write
+
+jobs:
+  collect-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Collect bazaar stats
+        run: pnpm collect
+
+      - name: Commit snapshots
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data
+          if git diff --cached --quiet; then
+            echo "No data changes"
+          else
+            git commit -m "chore: snapshot bazaar stats"
+            git push origin HEAD
+          fi
+
+      - run: pnpm test
+
+      - run: pnpm build
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+
+      - name: Prepare Cloudflare dist
+        run: |
+          mkdir -p cf-dist/siyuan-bazaar-stats
+          cp -r dist/. cf-dist/siyuan-bazaar-stats/
+          printf '%s\n' '/siyuan-bazaar-stats/* /siyuan-bazaar-stats/index.html 200' > cf-dist/_redirects
+          printf '%s\n' '<!doctype html><meta http-equiv="refresh" content="0;url=/siyuan-bazaar-stats/">' > cf-dist/index.html
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cf-dist
+          path: cf-dist
+
+  github-pages:
+    needs: collect-build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
+      - id: pages
+        uses: actions/deploy-pages@v5
+
+  cloudflare:
+    needs: collect-build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: cf-dist
+          path: cf-dist
+      - uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy cf-dist --project-name=siyuan-bazaar-stats
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,7 @@
+node_modules
+dist
+cf-dist
+*.local
+.DS_Store
+public/data
+.wrangler

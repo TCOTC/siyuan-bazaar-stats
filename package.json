@@ -1,0 +1,29 @@
+{
+  "name": "siyuan-bazaar-stats",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "packageManager": "pnpm@11.9.0",
+  "scripts": {
+    "collect": "tsx scripts/collect.ts",
+    "build-data": "tsx scripts/build-data.ts",
+    "typecheck": "vue-tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json --noEmit",
+    "build": "pnpm build-data && pnpm typecheck && vite build",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "vue": "^3.5.22",
+    "vue-router": "^4.5.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.5.2",
+    "@vitejs/plugin-vue": "^6.0.1",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.7",
+    "vitest": "^3.2.4",
+    "vue-tsc": "^3.0.8",
+    "wrangler": "^4.104.0"
+  }
+}

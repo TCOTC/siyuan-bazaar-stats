@@ -9,6 +9,7 @@
     "build-data": "tsx scripts/build-data.ts",
     "typecheck": "vue-tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json --noEmit",
     "build": "pnpm build-data && pnpm typecheck && vite build",
+    "dev": "vite",
     "preview": "vite preview",
     "test": "vitest run"
   },

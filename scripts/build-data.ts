@@ -2,7 +2,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { unescapeHtml } from '../src/lib/locale.ts'
 import { catalogDescription, catalogDisplayName, catalogIconURL } from '../src/lib/catalog-view.ts'
-import { applySnapshot } from '../src/lib/history.ts'
+import { reconstructHistories } from '../src/lib/history.ts'
 import { cloneStats, ratingFromStats } from '../src/lib/rating.ts'
 import type {
   Catalog,
@@ -72,25 +72,6 @@ async function loadSnapshots(): Promise<SnapshotFile[]> {
   return snapshots.sort((left, right) => left.t - right.t || left.g.localeCompare(right.g))
 }
 
-function reconstructHistories(snapshots: SnapshotFile[]): Record<string, PackageHistoryPoint[]> {
-  let current: Record<string, PackageStats> = {}
-  const histories: Record<string, PackageHistoryPoint[]> = {}
-  for (const snapshot of snapshots) {
-    current = applySnapshot(current, snapshot)
-    for (const [name, stats] of Object.entries(current)) {
-      const points = histories[name] ?? []
-      const last = points.at(-1)
-      if (last && last.t === snapshot.t) {
-        points[points.length - 1] = { t: snapshot.t, ...cloneStats(stats) }
-      } else {
-        points.push({ t: snapshot.t, ...cloneStats(stats) })
-      }
-      histories[name] = points
-    }
-  }
-  return histories
-}
-
 function lastStats(histories: Record<string, PackageHistoryPoint[]>): Record<string, PackageStats> {
   const stats: Record<string, PackageStats> = {}
   for (const [name, points] of Object.entries(histories)) {
@@ -136,7 +117,7 @@ function toSummary(
     downloadDelta24h: stats.d - (baseline?.d ?? stats.d),
     ratingCountDelta24h: (stats.c ?? 0) - (baseline?.c ?? stats.c ?? 0),
     sparklineDownloads: sparkline(history, (point) => point.d),
-    sparklineAverage: sparkline(history, (point) => point.a ?? 0),
+    sparklineAverage: sparkline(history.filter((point) => point.a !== undefined), (point) => point.a ?? 0),
   }
 }
 

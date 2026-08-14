@@ -31,10 +31,12 @@ watch(() => props.name, load)
 
 const rating = computed(() => detail.value ? ratingFromStats(detail.value.current) : undefined)
 const times = computed(() => detail.value?.history.map((point) => point.t) ?? [])
+const ratingHistory = computed(() => detail.value?.history.filter((point) => point.a !== undefined) ?? [])
+const ratingTimes = computed(() => ratingHistory.value.map((point) => point.t))
 const distributionSeries = computed(() => [1, 2, 3, 4, 5].map((star) => ({
   label: `${star} 星`,
   color: ['#b45309', '#c4a35a', '#d4b96a', '#7c9a6d', '#3f6b4a'][star - 1]!,
-  values: detail.value?.history.map((point) => point.x?.[star - 1] ?? 0) ?? [],
+  values: ratingHistory.value.map((point) => point.x?.[star - 1] ?? 0),
 })))
 </script>
 
@@ -96,25 +98,29 @@ const distributionSeries = computed(() => [1, 2, 3, 4, 5].map((star) => ({
     </section>
     <p v-else class="notice">这个包还没有公开评分。</p>
 
-    <TrendChart
-      title="平均分"
-      :times="times"
-      :series="[{ label: '均分', color: '#c4a35a', values: detail.history.map((point) => point.a ?? 0) }]"
-      :format-y="(value) => value.toFixed(1)"
-    />
-    <TrendChart
-      title="评分人数"
-      :times="times"
-      :series="[{ label: '人数', color: '#3f6b4a', values: detail.history.map((point) => point.c ?? 0) }]"
-      :format-y="formatNumber"
-    />
-    <TrendChart
-      title="评分分布趋势"
-      stacked
-      :times="times"
-      :series="distributionSeries"
-      :format-y="formatNumber"
-    />
+    <template v-if="ratingTimes.length >= 2">
+      <TrendChart
+        title="平均分"
+        :times="ratingTimes"
+        :series="[{ label: '均分', color: '#c4a35a', values: ratingHistory.map((point) => point.a ?? 0) }]"
+        :format-y="(value) => value.toFixed(1)"
+        :y-max="5"
+      />
+      <TrendChart
+        title="评分人数"
+        :times="ratingTimes"
+        :series="[{ label: '人数', color: '#3f6b4a', values: ratingHistory.map((point) => point.c ?? 0) }]"
+        :format-y="formatNumber"
+      />
+      <TrendChart
+        title="评分分布趋势"
+        stacked
+        :times="ratingTimes"
+        :series="distributionSeries"
+        :format-y="formatNumber"
+      />
+    </template>
+    <p v-else-if="rating" class="notice">评分还没有足够的历史点，暂时看不到趋势。</p>
     <TrendChart
       title="下载量"
       :times="times"

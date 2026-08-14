@@ -114,8 +114,7 @@ function comparePackages(left: SummaryPackage, right: SummaryPackage): number {
             <th>类型</th>
             <th>评分</th>
             <th>下载</th>
-            <th>近 24 小时</th>
-            <th>走势</th>
+            <th>近 24 小时下载</th>
           </tr>
         </thead>
         <tbody>
@@ -141,16 +140,22 @@ function comparePackages(left: SummaryPackage, right: SummaryPackage): number {
             <td>
               <template v-if="pkg.rating">
                 <StarRating :value="pkg.rating.average" />
-                <span class="muted">{{ formatAverage(pkg.rating.average) }} · {{ formatNumber(pkg.rating.count) }} 人</span>
+                <span class="muted">
+                  {{ formatAverage(pkg.rating.average) }} · {{ formatNumber(pkg.rating.count) }} 人
+                  <template v-if="pkg.ratingCountDelta24h">
+                    · {{ formatDelta(pkg.ratingCountDelta24h) }}
+                  </template>
+                </span>
+                <Sparkline :values="pkg.sparklineAverage" color="var(--gold)" />
               </template>
               <span v-else class="muted">暂无</span>
             </td>
-            <td>{{ formatNumber(pkg.downloads) }}</td>
+            <td>
+              <span class="metric-value">{{ formatNumber(pkg.downloads) }}</span>
+              <Sparkline :values="pkg.sparklineDownloads" />
+            </td>
             <td :class="{ up: pkg.downloadDelta24h > 0, down: pkg.downloadDelta24h < 0 }">
               {{ formatDelta(pkg.downloadDelta24h) }}
-            </td>
-            <td>
-              <Sparkline :values="pkg.sparklineDownloads" />
             </td>
           </tr>
         </tbody>

@@ -13,6 +13,7 @@ const props = defineProps<{
   times: number[]
   series: ChartSeries[]
   stacked?: boolean
+  yMax?: number
   formatY?: (value: number) => string
 }>()
 
@@ -39,6 +40,9 @@ const stackedValues = computed(() => {
 })
 
 const yMax = computed(() => {
+  if (props.yMax !== undefined) {
+    return props.yMax
+  }
   const values = stackedValues.value.flat()
   const max = Math.max(0, ...values)
   if (max <= 1) {
@@ -52,7 +56,13 @@ function xOf(index: number): number {
   if (props.times.length <= 1) {
     return pad.left + plotWidth / 2
   }
-  return pad.left + index * plotWidth / (props.times.length - 1)
+  const start = props.times[0]!
+  const end = props.times.at(-1)!
+  const span = end - start
+  if (span <= 0) {
+    return pad.left + plotWidth / 2
+  }
+  return pad.left + (props.times[index]! - start) / span * plotWidth
 }
 
 function yOf(value: number): number {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { parseBazaarIndex } from './parse-index.ts'
 import { buildPackageRating, statsEqual } from './rating.ts'
-import { applySnapshot, diffStats } from './history.ts'
+import { applySnapshot, diffStats, reconstructHistories } from './history.ts'
 import { unescapeHtml } from './locale.ts'
 import { isValidPackageName } from './names.ts'
 
@@ -79,5 +79,28 @@ describe('isValidPackageName', () => {
 describe('unescapeHtml', () => {
   it('restores ampersands from stage HTML entities', () => {
     expect(unescapeHtml('霞鹜文楷 &amp; Twemoji')).toBe('霞鹜文楷 & Twemoji')
+  })
+})
+
+describe('reconstructHistories', () => {
+  it('only appends packages that appear in each snapshot', () => {
+    const histories = reconstructHistories([
+      {
+        t: 100,
+        g: '1',
+        full: true,
+        p: {
+          alpha: { d: 10, a: 5, c: 1, x: [0, 0, 0, 0, 1] },
+          beta: { d: 3 },
+        },
+      },
+      {
+        t: 200,
+        g: '2',
+        p: { alpha: { d: 12, a: 5, c: 1, x: [0, 0, 0, 0, 1] } },
+      },
+    ])
+    expect(histories.alpha?.map((point) => point.d)).toEqual([10, 12])
+    expect(histories.beta?.map((point) => point.d)).toEqual([3])
   })
 })

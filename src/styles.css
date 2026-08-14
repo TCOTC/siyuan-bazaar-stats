@@ -184,6 +184,20 @@ a {
   font-size: 12px;
 }
 
+.metric-value {
+  display: block;
+}
+
+.sparkline {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+}
+
+.up {
+  color: var(--green);
+}
+
 .down {
   color: var(--red);
 }
@@ -211,6 +225,7 @@ a {
 .star-fill {
   overflow: hidden;
   color: var(--gold);
+  z-index: 1;
 }
 
 .dist-bars {

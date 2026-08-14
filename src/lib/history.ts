@@ -1,5 +1,5 @@
 import { cloneStats, statsEqual } from './rating.ts'
-import type { CollectorState, PackageStats, SnapshotFile } from './types.ts'
+import type { CollectorState, PackageHistoryPoint, PackageStats, SnapshotFile } from './types.ts'
 
 export function diffStats(
   previous: Record<string, PackageStats>,
@@ -28,6 +28,30 @@ export function applySnapshot(
     next[name] = cloneStats(stats)
   }
   return next
+}
+
+/** 只给快照里出现过的包追加历史点，避免未变化的包被重复铺平。 */
+export function reconstructHistories(snapshots: SnapshotFile[]): Record<string, PackageHistoryPoint[]> {
+  let current: Record<string, PackageStats> = {}
+  const histories: Record<string, PackageHistoryPoint[]> = {}
+  for (const snapshot of snapshots) {
+    current = applySnapshot(current, snapshot)
+    for (const name of Object.keys(snapshot.p)) {
+      const stats = current[name]
+      if (!stats) {
+        continue
+      }
+      const points = histories[name] ?? []
+      const last = points.at(-1)
+      if (last && last.t === snapshot.t) {
+        points[points.length - 1] = { t: snapshot.t, ...cloneStats(stats) }
+      } else {
+        points.push({ t: snapshot.t, ...cloneStats(stats) })
+      }
+      histories[name] = points
+    }
+  }
+  return histories
 }
 
 export function utcDay(timestamp: number): string {

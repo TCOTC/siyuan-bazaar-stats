@@ -1,19 +1,18 @@
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { USER_AGENT } from '../src/lib/constants.ts'
+import type { SnapshotFile } from '../src/lib/types.ts'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 export const DATA_DIR = path.join(ROOT, 'data')
 
-export async function readJson<T>(filePath: string): Promise<T | undefined> {
-  try {
-    return JSON.parse(await readFile(filePath, 'utf8')) as T
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return undefined
-    }
-    throw error
+export async function fetchJSON(url: string): Promise<unknown> {
+  const response = await fetch(url, { headers: { 'User-Agent': USER_AGENT } })
+  if (!response.ok) {
+    throw new Error(`GET ${url} -> ${response.status}`)
   }
+  return await response.json()
 }
 
 export async function writeJson(filePath: string, value: unknown): Promise<void> {
@@ -47,4 +46,14 @@ export async function listFiles(dir: string, suffix: string): Promise<string[]> 
     }
     throw error
   }
+}
+
+export async function loadSnapshots(): Promise<SnapshotFile[]> {
+  const dir = path.join(DATA_DIR, 'snapshots')
+  const files = await listFiles(dir, '.jsonl')
+  const snapshots: SnapshotFile[] = []
+  for (const file of files) {
+    snapshots.push(...await readJsonl<SnapshotFile>(path.join(dir, file)))
+  }
+  return snapshots.sort((left, right) => left.t - right.t || left.g.localeCompare(right.g))
 }

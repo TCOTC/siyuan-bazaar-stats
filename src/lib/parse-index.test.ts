@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { parseBazaarIndex } from './parse-index.ts'
-import { buildPackageRating, statsEqual } from './rating.ts'
-import { applySnapshot, diffStats, reconstructHistories } from './history.ts'
+import { buildPackageRating, dehydrateStats, hydrateStats, statsEqual } from './rating.ts'
+import { applySnapshot, diffStats, lastFullTimestamp, overlayCurrentStats, reconstructHistories, shouldWriteFullSnapshot } from './history.ts'
 import { unescapeHtml } from './locale.ts'
 import { parseStageUpdated, parseBazaarHash } from './catalog-view.ts'
 import { isValidPackageName } from './names.ts'
@@ -43,11 +43,24 @@ describe('rating helpers', () => {
     expect(buildPackageRating([0, 0, 0, 2, 2])?.average).toBe(4.5)
   })
 
-  it('treats missing rating as different from a zeroed rating object shape', () => {
-    expect(statsEqual({ d: 1 }, { d: 1, c: 0 })).toBe(false)
-    expect(statsEqual({ d: 1, a: 5, c: 1, x: [0, 0, 0, 0, 1] }, {
+  it('compares persisted fields only, ignoring derived a/c', () => {
+    expect(statsEqual({ d: 1 }, { d: 1, x: [0, 0, 0, 0, 1] })).toBe(false)
+    expect(statsEqual({ d: 1, x: [0, 0, 0, 0, 1] }, {
       d: 1, a: 5, c: 1, x: [0, 0, 0, 0, 1],
     })).toBe(true)
+  })
+
+  it('derives a/c from x and strips them for snapshots', () => {
+    expect(hydrateStats({ d: 10, x: [0, 0, 0, 0, 2] })).toEqual({
+      d: 10, a: 5, c: 2, x: [0, 0, 0, 0, 2],
+    })
+    expect(hydrateStats({ d: 10, a: 4, c: 9, x: [0, 0, 0, 0, 2] })).toEqual({
+      d: 10, a: 5, c: 2, x: [0, 0, 0, 0, 2],
+    })
+    expect(dehydrateStats({ d: 10, a: 5, c: 2, x: [0, 0, 0, 0, 2] })).toEqual({
+      d: 10, x: [0, 0, 0, 0, 2],
+    })
+    expect(hydrateStats({ d: 3 })).toEqual({ d: 3 })
   })
 })
 
@@ -107,17 +120,47 @@ describe('reconstructHistories', () => {
         g: '1',
         full: true,
         p: {
-          alpha: { d: 10, a: 5, c: 1, x: [0, 0, 0, 0, 1] },
+          alpha: { d: 10, x: [0, 0, 0, 0, 1] },
           beta: { d: 3 },
         },
       },
       {
         t: 200,
         g: '2',
-        p: { alpha: { d: 12, a: 5, c: 1, x: [0, 0, 0, 0, 1] } },
+        p: { alpha: { d: 12, x: [0, 0, 0, 0, 1] } },
       },
     ])
     expect(histories.alpha?.map((point) => point.d)).toEqual([10, 12])
+    expect(histories.alpha?.[0]).toMatchObject({ t: 100, d: 10, a: 5, c: 1 })
     expect(histories.beta?.map((point) => point.d)).toEqual([3])
+  })
+})
+
+describe('snapshot cadence', () => {
+  it('writes a full snapshot when the UTC day changes', () => {
+    expect(shouldWriteFullSnapshot(undefined, 100)).toBe(true)
+    expect(shouldWriteFullSnapshot(1786665600, 1786665600)).toBe(false)
+    expect(shouldWriteFullSnapshot(1786665600, 1786752000)).toBe(true)
+    expect(lastFullTimestamp([
+      { t: 10, g: '1', full: true, p: {} },
+      { t: 20, g: '2', p: { a: { d: 1 } } },
+    ])).toBe(10)
+  })
+})
+
+describe('overlayCurrentStats', () => {
+  it('appends a live point only when stats changed', () => {
+    const histories = {
+      keep: [{ t: 100, d: 1 }],
+      change: [{ t: 100, d: 2 }],
+    }
+    const next = overlayCurrentStats(histories, {
+      keep: { d: 1 },
+      change: { d: 3 },
+      add: { d: 4, x: [0, 0, 0, 0, 1] },
+    }, 200)
+    expect(next.keep?.map((point) => point.d)).toEqual([1])
+    expect(next.change?.map((point) => point.d)).toEqual([2, 3])
+    expect(next.add?.at(-1)).toMatchObject({ t: 200, d: 4, a: 5, c: 1 })
   })
 })

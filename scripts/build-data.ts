@@ -1,38 +1,58 @@
+import { rm } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { unescapeHtml } from '../src/lib/locale.ts'
 import { catalogDescription, catalogDisplayName, catalogIconURL } from '../src/lib/catalog-view.ts'
-import { reconstructHistories } from '../src/lib/history.ts'
+import { bazaarIndexURL } from '../src/lib/constants.ts'
+import { overlayCurrentStats, reconstructHistories, replayPackages } from '../src/lib/history.ts'
+import { parseBazaarIndex, indexToStats } from '../src/lib/parse-index.ts'
 import { cloneStats, ratingFromStats } from '../src/lib/rating.ts'
 import type {
+  BazaarIndex,
   Catalog,
-  CollectorState,
   PackageDetail,
   PackageHistoryPoint,
   PackageStats,
   SiteSummary,
-  SnapshotFile,
   SummaryPackage,
 } from '../src/lib/types.ts'
-import { DATA_DIR, listFiles, readJson, readJsonl, writeJson } from './io.ts'
+import { loadCatalog } from './catalog.ts'
+import { fetchJSON, loadSnapshots, writeJson } from './io.ts'
 
 const DAY = 24 * 60 * 60
 const SPARKLINE_POINTS = 48
 
 export async function buildSiteData(): Promise<void> {
-  const state = await readJson<CollectorState>(path.join(DATA_DIR, 'state.json'))
-  const catalog = await readJson<Catalog>(path.join(DATA_DIR, 'catalog.json'))
+  const now = Date.now()
   const snapshots = await loadSnapshots()
-  const histories = reconstructHistories(snapshots)
-  const publishedAt = state?.publishedAt ?? lastTimestamp(histories)
-  const packages = Object.entries(state?.packages ?? lastStats(histories))
+  let histories = reconstructHistories(snapshots)
+  const catalog = await loadCatalogSafe(Math.floor(now / 1000))
+  const index = await loadLiveIndex(now)
+
+  let publishedAt = snapshots.at(-1)?.t ?? lastTimestamp(histories)
+  let generation = snapshots.at(-1)?.g ?? ''
+  let updatedAt = publishedAt
+  let currentStats: Record<string, PackageStats>
+
+  if (index) {
+    const live = indexToStats(index)
+    histories = overlayCurrentStats(histories, live, index.publishedAt)
+    currentStats = live
+    publishedAt = index.publishedAt
+    generation = index.generation
+    updatedAt = Math.floor(now / 1000)
+  } else {
+    currentStats = replayPackages(snapshots)
+  }
+
+  const packages = Object.entries(currentStats)
     .map(([name, stats]) => toSummary(name, stats, catalog, histories[name] ?? [], publishedAt))
     .sort(compareSummary)
 
   const summary: SiteSummary = {
-    updatedAt: state?.fetchedAt ?? publishedAt,
+    updatedAt,
     publishedAt,
-    generation: state?.generation ?? '',
+    generation,
     totals: {
       packages: packages.length,
       rated: packages.filter((pkg) => pkg.rating).length,
@@ -43,9 +63,10 @@ export async function buildSiteData(): Promise<void> {
   }
 
   const publicData = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../public/data')
+  await rm(path.join(publicData, 'packages'), { recursive: true, force: true })
   await writeJson(path.join(publicData, 'summary.json'), summary)
   for (const pkg of packages) {
-    const last = histories[pkg.name]?.at(-1)
+    const current = currentStats[pkg.name]
     const detail: PackageDetail = {
       name: pkg.name,
       type: pkg.type,
@@ -55,7 +76,7 @@ export async function buildSiteData(): Promise<void> {
       description: pkg.description,
       ...(pkg.iconURL ? { iconURL: pkg.iconURL } : {}),
       ...(pkg.updatedAt ? { updatedAt: pkg.updatedAt } : {}),
-      current: last ? cloneStats(last) : { d: pkg.downloads },
+      current: current ? cloneStats(current) : { d: pkg.downloads },
       history: histories[pkg.name] ?? [],
     }
     await writeJson(path.join(publicData, 'packages', `${pkg.name}.json`), detail)
@@ -63,25 +84,22 @@ export async function buildSiteData(): Promise<void> {
   console.log(`built site data: ${packages.length} packages, ${snapshots.length} snapshots`)
 }
 
-async function loadSnapshots(): Promise<SnapshotFile[]> {
-  const dir = path.join(DATA_DIR, 'snapshots')
-  const files = await listFiles(dir, '.jsonl')
-  const snapshots: SnapshotFile[] = []
-  for (const file of files) {
-    snapshots.push(...await readJsonl<SnapshotFile>(path.join(dir, file)))
+async function loadLiveIndex(now: number): Promise<BazaarIndex | undefined> {
+  try {
+    return parseBazaarIndex(await fetchJSON(bazaarIndexURL(now)))
+  } catch (error) {
+    console.warn('fetch bazaar index failed:', error)
+    return undefined
   }
-  return snapshots.sort((left, right) => left.t - right.t || left.g.localeCompare(right.g))
 }
 
-function lastStats(histories: Record<string, PackageHistoryPoint[]>): Record<string, PackageStats> {
-  const stats: Record<string, PackageStats> = {}
-  for (const [name, points] of Object.entries(histories)) {
-    const last = points.at(-1)
-    if (last) {
-      stats[name] = last
-    }
+async function loadCatalogSafe(now: number): Promise<Catalog | undefined> {
+  try {
+    return await loadCatalog(now, undefined)
+  } catch (error) {
+    console.warn('fetch catalog failed:', error)
+    return undefined
   }
-  return stats
 }
 
 function lastTimestamp(histories: Record<string, PackageHistoryPoint[]>): number {
@@ -116,7 +134,7 @@ function toSummary(
     downloads: stats.d,
     ...(rating ? { rating } : {}),
     downloadDelta24h: stats.d - (baseline?.d ?? stats.d),
-    ratingCountDelta24h: (stats.c ?? 0) - (baseline?.c ?? stats.c ?? 0),
+    ratingCountDelta24h: (rating?.count ?? 0) - (baseline ? ratingFromStats(baseline)?.count ?? 0 : rating?.count ?? 0),
     sparklineDownloads: sparkline(history, (point) => point.d),
     sparklineAverage: sparkline(history.filter((point) => point.a !== undefined), (point) => point.a ?? 0),
     updatedAt: meta?.updatedAt ?? 0,

@@ -24,7 +24,7 @@ export type BazaarIndex = {
   packages: Record<string, IndexPackage>
 }
 
-/** 单个包在某一时刻的完整统计。无 `c` 或 `c` 为 0 表示当时没有公开评分。 */
+/** 单个包在某一时刻的完整统计。无 `x` 表示当时没有公开评分。`a` / `c` 由 `x` 推导，不写入快照。 */
 export type PackageStats = {
   d: number
   a?: number
@@ -32,19 +32,12 @@ export type PackageStats = {
   x?: RatingDistribution
 }
 
+/** 仓库中的一行快照。`p` 只持久化 `d` 与可选的 `x`。 */
 export type SnapshotFile = {
   t: number
   g: string
   full?: boolean
   p: Record<string, PackageStats>
-}
-
-export type CollectorState = {
-  generation: string
-  publishedAt: number
-  fetchedAt: number
-  lastFullAt: number
-  packages: Record<string, PackageStats>
 }
 
 export type LocaleStrings = Record<string, string>

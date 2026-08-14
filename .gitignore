@@ -4,4 +4,6 @@ cf-dist
 *.local
 .DS_Store
 public/data
+data/state.json
+data/catalog.json
 .wrangler

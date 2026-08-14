@@ -57,14 +57,40 @@ export function statsFromIndexPackage(downloads: number, rating: PackageRating |
 }
 
 export function ratingFromStats(stats: PackageStats): PackageRating | undefined {
-  if (!stats.c || stats.c < 1 || !stats.x || stats.a === undefined) {
+  if (!stats.x) {
     return undefined
   }
-  return normalizePackageRating({
-    average: stats.a,
-    count: stats.c,
-    distribution: stats.x,
-  })
+  return buildPackageRating(stats.x)
+}
+
+/** 从快照字段还原均分和人数；忽略已持久化的 `a` / `c`。 */
+export function hydrateStats(stats: PackageStats): PackageStats {
+  const rating = stats.x ? buildPackageRating(stats.x) : undefined
+  if (!rating || !stats.x) {
+    return { d: stats.d }
+  }
+  return {
+    d: stats.d,
+    a: rating.average,
+    c: rating.count,
+    x: [...stats.x] as RatingDistribution,
+  }
+}
+
+/** 快照只保留下载量和评分分布。 */
+export function dehydrateStats(stats: PackageStats): PackageStats {
+  return {
+    d: stats.d,
+    ...(stats.x ? { x: [...stats.x] as RatingDistribution } : {}),
+  }
+}
+
+export function dehydratePackages(packages: Record<string, PackageStats>): Record<string, PackageStats> {
+  const result: Record<string, PackageStats> = {}
+  for (const [name, stats] of Object.entries(packages)) {
+    result[name] = dehydrateStats(stats)
+  }
+  return result
 }
 
 export function statsEqual(left: PackageStats | undefined, right: PackageStats | undefined): boolean {
@@ -74,7 +100,7 @@ export function statsEqual(left: PackageStats | undefined, right: PackageStats |
   if (!left || !right) {
     return false
   }
-  if (left.d !== right.d || left.a !== right.a || left.c !== right.c) {
+  if (left.d !== right.d) {
     return false
   }
   if (!left.x && !right.x) {

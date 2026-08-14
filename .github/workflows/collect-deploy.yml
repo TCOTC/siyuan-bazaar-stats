@@ -111,20 +111,8 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          AUTH_HEADER="Authorization: Bearer ${CLOUDFLARE_API_TOKEN}"
           curl -sS -X POST \
             "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/siyuan-bazaar-stats/domains" \
-            -H "$AUTH_HEADER" \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
             -H "Content-Type: application/json" \
-            -d '{"name":"siyuan-bazaar-stats.mytemos.com"}' || true
-          echo
-          LIST=$(curl -sS "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/siyuan-bazaar-stats/domains" -H "$AUTH_HEADER")
-          echo "$LIST"
-          ZONE_ID=$(python3 -c "import json,sys
-items=json.loads(sys.argv[1]).get('result') or []
-print(next((i.get('zone_tag') or '' for i in items if i.get('name')=='siyuan-bazaar-stats.mytemos.com'), ''))" "$LIST")
-          echo "zone_id=$ZONE_ID"
-          curl -sS -X POST "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/dns_records" \
-            -H "$AUTH_HEADER" \
-            -H "Content-Type: application/json" \
-            -d '{"type":"CNAME","name":"siyuan-bazaar-stats","content":"siyuan-bazaar-stats.pages.dev","proxied":true}'
+            -d '{"name":"siyuan-bazaar-stats.mytemos.com"}'

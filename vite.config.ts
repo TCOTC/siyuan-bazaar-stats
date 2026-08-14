@@ -3,7 +3,8 @@ import { copyFileSync, existsSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
-import { SITE_BASE } from './src/lib/constants.ts'
+
+const base = process.env.VITE_BASE ?? '/'
 
 function spaFallback() {
   return {
@@ -18,7 +19,7 @@ function spaFallback() {
 }
 
 export default defineConfig({
-  base: SITE_BASE,
+  base,
   plugins: [vue(), spaFallback()],
   resolve: {
     alias: {

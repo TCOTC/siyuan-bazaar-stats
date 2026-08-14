@@ -118,9 +118,11 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{"name":"siyuan-bazaar-stats.mytemos.com"}' || true
           echo
-          ZONES=$(curl -sS "https://api.cloudflare.com/client/v4/zones?name=mytemos.com" -H "$AUTH_HEADER")
-          echo "$ZONES"
-          ZONE_ID=$(python3 -c "import json,sys; r=json.loads(sys.argv[1]).get('result') or []; print(r[0]['id'] if r else '')" "$ZONES")
+          LIST=$(curl -sS "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/siyuan-bazaar-stats/domains" -H "$AUTH_HEADER")
+          echo "$LIST"
+          ZONE_ID=$(python3 -c "import json,sys
+items=json.loads(sys.argv[1]).get('result') or []
+print(next((i.get('zone_tag') or '' for i in items if i.get('name')=='siyuan-bazaar-stats.mytemos.com'), ''))" "$LIST")
           echo "zone_id=$ZONE_ID"
           curl -sS -X POST "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/dns_records" \
             -H "$AUTH_HEADER" \

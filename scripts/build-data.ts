@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { unescapeHtml } from '../src/lib/locale.ts'
 import { catalogDescription, catalogDisplayName, catalogIconURL } from '../src/lib/catalog-view.ts'
 import { applySnapshot } from '../src/lib/history.ts'
 import { cloneStats, ratingFromStats } from '../src/lib/rating.ts'
@@ -126,7 +127,7 @@ function toSummary(
     name,
     type: meta?.type,
     repo: meta?.repo ?? '',
-    author: meta?.author ?? '',
+    author: unescapeHtml(meta?.author ?? ''),
     displayName: catalogDisplayName(meta, name),
     description: catalogDescription(meta),
     ...(catalogIconURL(meta) ? { iconURL: catalogIconURL(meta) } : {}),

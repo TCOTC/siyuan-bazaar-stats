@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { parseBazaarIndex } from './parse-index.ts'
 import { buildPackageRating, statsEqual } from './rating.ts'
 import { applySnapshot, diffStats } from './history.ts'
+import { unescapeHtml } from './locale.ts'
 import { isValidPackageName } from './names.ts'
 
 describe('parseBazaarIndex', () => {
@@ -72,5 +73,11 @@ describe('isValidPackageName', () => {
   it('rejects path-like names', () => {
     expect(isValidPackageName('owner/repo')).toBe(false)
     expect(isValidPackageName('sample')).toBe(true)
+  })
+})
+
+describe('unescapeHtml', () => {
+  it('restores ampersands from stage HTML entities', () => {
+    expect(unescapeHtml('霞鹜文楷 &amp; Twemoji')).toBe('霞鹜文楷 & Twemoji')
   })
 })

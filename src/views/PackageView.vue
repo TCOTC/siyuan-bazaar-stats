@@ -46,7 +46,16 @@ const distributionSeries = computed(() => [1, 2, 3, 4, 5].map((star) => ({
   <section v-else-if="!detail" class="notice">正在加载 {{ name }}…</section>
   <template v-else>
     <section class="pkg-hero">
-      <img v-if="detail.iconURL" class="pkg-icon" :src="detail.iconURL" :alt="detail.displayName" width="72" height="72" />
+      <img
+        v-if="detail.iconURL"
+        class="pkg-icon"
+        :src="detail.iconURL"
+        :alt="detail.displayName"
+        width="72"
+        height="72"
+        loading="lazy"
+        decoding="async"
+      />
       <div>
         <p class="eyebrow">{{ detail.type ? TYPE_LABELS[detail.type] : '集市包' }}</p>
         <h1>{{ detail.displayName }}</h1>

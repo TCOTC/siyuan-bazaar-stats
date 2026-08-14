@@ -122,7 +122,15 @@ function comparePackages(left: SummaryPackage, right: SummaryPackage): number {
           <tr v-for="pkg in filtered" :key="pkg.name">
             <td>
               <RouterLink class="pkg-link" :to="{ name: 'package', params: { name: pkg.name } }">
-                <img v-if="pkg.iconURL" :src="pkg.iconURL" :alt="pkg.displayName" width="28" height="28" />
+                <img
+                  v-if="pkg.iconURL"
+                  :src="pkg.iconURL"
+                  :alt="pkg.displayName"
+                  width="28"
+                  height="28"
+                  loading="lazy"
+                  decoding="async"
+                />
                 <span>
                   <strong>{{ pkg.displayName }}</strong>
                   <small>{{ pkg.name }}</small>

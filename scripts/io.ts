@@ -7,12 +7,33 @@ import type { SnapshotFile } from '../src/lib/types.ts'
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 export const DATA_DIR = path.join(ROOT, 'data')
 
+const FETCH_ATTEMPTS = 4
+const FETCH_RETRY_BASE_MS = 2000
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 export async function fetchJSON(url: string): Promise<unknown> {
-  const response = await fetch(url, { headers: { 'User-Agent': USER_AGENT } })
-  if (!response.ok) {
-    throw new Error(`GET ${url} -> ${response.status}`)
+  let lastError: Error | undefined
+  for (let attempt = 1; attempt <= FETCH_ATTEMPTS; attempt++) {
+    try {
+      const response = await fetch(url, { headers: { 'User-Agent': USER_AGENT } })
+      if (!response.ok) {
+        throw new Error(`GET ${url} -> ${response.status}`)
+      }
+      return await response.json()
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error))
+      if (attempt === FETCH_ATTEMPTS) {
+        break
+      }
+      const delay = FETCH_RETRY_BASE_MS * attempt
+      console.warn(`${lastError.message}; retry ${attempt}/${FETCH_ATTEMPTS - 1} in ${delay}ms`)
+      await sleep(delay)
+    }
   }
-  return await response.json()
+  throw lastError
 }
 
 export async function writeJson(filePath: string, value: unknown): Promise<void> {

@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 import ThemeToggle from './components/ThemeToggle.vue'
-import { SITE_REPO_URL } from './lib/constants.ts'
+import { DATA_LICENSE_URL, SITE_REPO_URL } from './lib/constants.ts'
 
 const route = useRoute()
 const isHome = computed(() => route.name === 'home')
@@ -35,7 +35,9 @@ const isHome = computed(() => route.name === 'home')
       <a href="https://github.com/siyuan-note/siyuan/issues/16711" target="_blank" rel="noreferrer">siyuan#16711</a>
       。源码在
       <a :href="SITE_REPO_URL" target="_blank" rel="noreferrer">GitHub</a>
-      。趋势图使用
+      。统计数据按
+      <a :href="DATA_LICENSE_URL" target="_blank" rel="noreferrer">CC BY 4.0</a>
+      授权。趋势图使用
       <a href="https://www.highcharts.com" target="_blank" rel="noreferrer">Highcharts</a>
       个人非商业许可。
     </footer>

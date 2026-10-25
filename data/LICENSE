@@ -1,0 +1,57 @@
+# 数据许可 / Data License
+
+本目录下由 [siyuan-bazaar-stats](https://github.com/TCOTC/siyuan-bazaar-stats) 采集并整理的数据，
+以及由这些数据构建、在站点 `/data/` 下发布的 JSON 文件，按
+**Creative Commons Attribution 4.0 International（CC BY 4.0）** 提供。
+
+- 许可全文：<https://creativecommons.org/licenses/by/4.0/legalcode>
+- 人类可读摘要：<https://creativecommons.org/licenses/by/4.0/>
+
+## 适用范围
+
+**覆盖**：
+
+- `data/snapshots/*.jsonl` —— 每 30 分钟增量采集的原始快照
+- 由快照重建的数值字段，包括 `downloads`、`downloadDelta24h`、
+  `rating`（`average` / `count` / `distribution`）、`ratingCountDelta24h`、
+  `sparklineDownloads`、`sparklineAverage`、`history`、`current`、`totals`、
+  `updatedAt`、`publishedAt`、`generation`
+- 站点 `/data/` 下随上述数值一同发布的包信息字段：`name`、`type`、`repo`、
+  `displayName`、`description`、`author`、`iconURL`
+
+**不覆盖**：
+
+- 由平台提供的上游资源：`bazaar.b3logfile.com`、`oss.b3logfile.com`、
+  `siyuan-sync.b3logfile.com` 上的文件与图标，权利归其提供方。
+- 仓库中的源代码，见根目录 `LICENSE`（MIT）。
+
+## 署名方式
+
+请至少包含：
+
+1. 数据来源名称与本仓库链接：<https://github.com/TCOTC/siyuan-bazaar-stats>
+2. 指向本许可（CC BY 4.0）的链接
+3. 如对数据做过筛选、聚合或换算，说明做了哪些修改
+
+示例：
+
+> 数据来源：[siyuan-bazaar-stats](https://github.com/TCOTC/siyuan-bazaar-stats)
+> （CC BY 4.0）。本图仅使用其中的下载量与评分字段，并按其观测时间重采样。
+
+## 限制与免责
+
+- 许可不授予使用本项目名称、logo 或站点域名的权利，也不得暗示本项目为你的服务、
+  产品或发布内容背书。
+- 本项目与思源笔记官方及思源集市无隶属关系，未获其背书。
+- 数据按「现状」提供，不保证完整、准确、及时或连续。采集依赖 GitHub Actions
+  定时任务（每 30 分钟一次，可能延迟或失败）与上游 `bazaar/index.json`，
+  两者都可能缺失观察点；重建的历史在快照缺失区间内为插值/沿用值，而非真实观测。
+- 许可一经发布不可撤回：已按 CC BY 4.0 获得的副本可继续按其条款使用。
+
+## 使用建议
+
+- `data/summary.json`（站点 `/data/summary.json`）已包含全部集的当前数值与最近 48 点
+  sparkline，通常不必逐包请求 `/data/packages/*.json`。
+- 该产物每次采集后重新生成，内容整体变化；若需轮询，请使用条件请求
+  （`If-None-Match` / `If-Modified-Since`）或核对 `updatedAt`，避免全量重复拉取。
+- 展示历史曲线时，请使用各点的真实时间戳 `t`（Unix 秒），不要假设采样间隔均匀。

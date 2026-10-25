@@ -1,4 +1,5 @@
 export const SITE_REPO_URL = 'https://github.com/TCOTC/siyuan-bazaar-stats'
+export const DATA_LICENSE_URL = `${SITE_REPO_URL}/blob/main/data/LICENSE`
 export const BAZAAR_INDEX_URL = 'https://bazaar.b3logfile.com/bazaar/index.json'
 export const BAZAAR_OSS_SERVER = 'https://oss.b3logfile.com'
 export const RHY_VERSION_URL = 'https://siyuan-sync.b3logfile.com/apis/siyuan/version?ver=3.8.0'

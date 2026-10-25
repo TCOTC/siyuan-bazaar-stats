@@ -1,5 +1,8 @@
 export const PACKAGE_TYPES = ['plugins', 'themes', 'widgets', 'icons', 'templates'] as const
 
+/** 站点 JSON 产物的格式版本。字段新增/语义改动时递增，供第三方消费方检测。 */
+export const DATA_SCHEMA = 1
+
 export type PackageType = (typeof PACKAGE_TYPES)[number]
 
 export type RatingDistribution = [number, number, number, number, number]
@@ -75,6 +78,7 @@ export type SummaryPackage = {
 }
 
 export type SiteSummary = {
+  schema: number
   updatedAt: number
   publishedAt: number
   generation: string
@@ -92,6 +96,7 @@ export type PackageHistoryPoint = {
 } & PackageStats
 
 export type PackageDetail = {
+  schema: number
   name: string
   type?: PackageType
   repo: string

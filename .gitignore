@@ -5,3 +5,4 @@ cf-dist
 .DS_Store
 public/data
 .wrangler
+.cache

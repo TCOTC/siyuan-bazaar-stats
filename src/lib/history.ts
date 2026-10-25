@@ -6,14 +6,10 @@ export function diffStats(
   next: Record<string, PackageStats>,
 ): Record<string, PackageStats> {
   const changes: Record<string, PackageStats> = {}
+  // 只遍历 next：索引中消失的包保留最后一次统计，不写入「删除」点。
   for (const [name, stats] of Object.entries(next)) {
     if (!statsEqual(previous[name], stats)) {
       changes[name] = cloneStats(stats)
-    }
-  }
-  for (const name of Object.keys(previous)) {
-    if (!(name in next)) {
-      // 索引中消失的包保留最后一次统计，不写入“删除”点。
     }
   }
   return changes
@@ -48,7 +44,13 @@ export function lastFullTimestamp(snapshots: SnapshotFile[]): number | undefined
   return undefined
 }
 
-/** 把当前索引叠进历史：只追加有变化的点，不写回仓库。 */
+/**
+ * 把当前索引叠进历史：只追加有变化的点，不写回仓库。
+ *
+ * 只在快照落后于索引时（单独跑 `pnpm build-data`）才可能追加新点；工作流里 `collect`
+ * 刚写过快照，索引的 `publishedAt` 与最后一条快照相同，此时只是把该点替换成全量字段。
+ * `live` 可能只带 `d` / `x`，所以需要 `hydrateStats` 补出 `a` / `c`。
+ */
 export function overlayCurrentStats(
   histories: Record<string, PackageHistoryPoint[]>,
   live: Record<string, PackageStats>,

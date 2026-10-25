@@ -36,6 +36,13 @@ describe('parseBazaarIndex', () => {
       packages: {},
     })).toThrow(/schema/)
   })
+
+  it('rejects an index with no packages', () => {
+    expect(() => parseBazaarIndex({
+      meta: { schema: 2, ratingsAvailable: true, generation: '1', publishedAt: 1 },
+      packages: {},
+    })).toThrow(/no packages/)
+  })
 })
 
 describe('rating helpers', () => {

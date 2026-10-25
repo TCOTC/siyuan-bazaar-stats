@@ -1,6 +1,6 @@
 import { isValidBazaarRepo, isValidPackageName } from './names.ts'
 import { normalizePackageRating, statsFromIndexPackage } from './rating.ts'
-import type { BazaarIndex, IndexPackage, PackageRating, RatingDistribution } from './types.ts'
+import type { BazaarIndex, IndexPackage, PackageRating, PackageStats, RatingDistribution } from './types.ts'
 
 type RawIndex = {
   meta?: {
@@ -43,6 +43,10 @@ export function parseBazaarIndex(raw: unknown): BazaarIndex {
   }
   if (!data.packages || typeof data.packages !== 'object' || Array.isArray(data.packages)) {
     throw new Error('bazaar index packages are missing')
+  }
+  // 结构合法但为空，说明上游异常。若放行，构建会成功并发布一份 0 个包的产物。
+  if (Object.keys(data.packages).length === 0) {
+    throw new Error('bazaar index contains no packages')
   }
 
   const packages: Record<string, IndexPackage> = {}
@@ -96,8 +100,8 @@ function parseRawRating(raw: {
   })
 }
 
-export function indexToStats(index: BazaarIndex): Record<string, ReturnType<typeof statsFromIndexPackage>> {
-  const stats: Record<string, ReturnType<typeof statsFromIndexPackage>> = {}
+export function indexToStats(index: BazaarIndex): Record<string, PackageStats> {
+  const stats: Record<string, PackageStats> = {}
   for (const [name, pkg] of Object.entries(index.packages)) {
     stats[name] = statsFromIndexPackage(pkg.downloads, pkg.rating)
   }

@@ -4,9 +4,10 @@ import { fileURLToPath } from 'node:url'
 import { unescapeHtml } from '../src/lib/locale.ts'
 import { catalogDescription, catalogDisplayName, catalogIconURL } from '../src/lib/catalog-view.ts'
 import { bazaarIndexURL } from '../src/lib/constants.ts'
-import { overlayCurrentStats, reconstructHistories, replayPackages } from '../src/lib/history.ts'
+import { overlayCurrentStats, reconstructHistories } from '../src/lib/history.ts'
 import { parseBazaarIndex, indexToStats } from '../src/lib/parse-index.ts'
 import { cloneStats, ratingFromStats } from '../src/lib/rating.ts'
+import { DATA_SCHEMA } from '../src/lib/types.ts'
 import type {
   BazaarIndex,
   Catalog,
@@ -17,6 +18,7 @@ import type {
   SummaryPackage,
 } from '../src/lib/types.ts'
 import { loadCatalog } from './catalog.ts'
+import { readIndexCache } from './index-cache.ts'
 import { fetchJSON, loadSnapshots, writeJson } from './io.ts'
 
 const DAY = 24 * 60 * 60
@@ -25,31 +27,24 @@ const SPARKLINE_POINTS = 48
 export async function buildSiteData(): Promise<void> {
   const now = Date.now()
   const snapshots = await loadSnapshots()
-  let histories = reconstructHistories(snapshots)
-  const catalog = await loadCatalogSafe(Math.floor(now / 1000))
+  // 集市索引是「哪些包在架」的唯一依据：产物只包含索引里的包，已下架的包不进产物。
+  // 取不到索引就无法确定在架集合，因此直接失败让工作流报红，由 GitHub 通知维护者，
+  // 而不是静默降级出一份无法判断在架状态的产物。
   const index = await loadLiveIndex(now)
+  const catalog = await loadCatalogSafe(Math.floor(now / 1000))
 
-  let publishedAt = snapshots.at(-1)?.t ?? lastTimestamp(histories)
-  let generation = snapshots.at(-1)?.g ?? ''
-  let updatedAt = publishedAt
-  let currentStats: Record<string, PackageStats>
-
-  if (index) {
-    const live = indexToStats(index)
-    histories = overlayCurrentStats(histories, live, index.publishedAt)
-    currentStats = live
-    publishedAt = index.publishedAt
-    generation = index.generation
-    updatedAt = Math.floor(now / 1000)
-  } else {
-    currentStats = replayPackages(snapshots)
-  }
+  const currentStats = indexToStats(index)
+  const histories = overlayCurrentStats(reconstructHistories(snapshots), currentStats, index.publishedAt)
+  const publishedAt = index.publishedAt
+  const generation = index.generation
+  const updatedAt = Math.floor(now / 1000)
 
   const packages = Object.entries(currentStats)
-    .map(([name, stats]) => toSummary(name, stats, catalog, histories[name] ?? [], publishedAt))
+    .map(([name, stats]) => toSummary(name, stats, catalog, index.packages[name]!.repo, histories[name] ?? [], publishedAt))
     .sort(compareSummary)
 
   const summary: SiteSummary = {
+    schema: DATA_SCHEMA,
     updatedAt,
     publishedAt,
     generation,
@@ -66,8 +61,8 @@ export async function buildSiteData(): Promise<void> {
   await rm(path.join(publicData, 'packages'), { recursive: true, force: true })
   await writeJson(path.join(publicData, 'summary.json'), summary)
   for (const pkg of packages) {
-    const current = currentStats[pkg.name]
     const detail: PackageDetail = {
+      schema: DATA_SCHEMA,
       name: pkg.name,
       type: pkg.type,
       repo: pkg.repo,
@@ -76,7 +71,7 @@ export async function buildSiteData(): Promise<void> {
       description: pkg.description,
       ...(pkg.iconURL ? { iconURL: pkg.iconURL } : {}),
       ...(pkg.updatedAt ? { updatedAt: pkg.updatedAt } : {}),
-      current: current ? cloneStats(current) : { d: pkg.downloads },
+      current: cloneStats(currentStats[pkg.name]!),
       history: histories[pkg.name] ?? [],
     }
     await writeJson(path.join(publicData, 'packages', `${pkg.name}.json`), detail)
@@ -84,12 +79,19 @@ export async function buildSiteData(): Promise<void> {
   console.log(`built site data: ${packages.length} packages, ${snapshots.length} snapshots`)
 }
 
-async function loadLiveIndex(now: number): Promise<BazaarIndex | undefined> {
+async function loadLiveIndex(now: number): Promise<BazaarIndex> {
+  // 同一次工作流里 collect 已经请求过索引，优先复用它，保证两步看到的是同一份数据。
+  const cached = await readIndexCache()
+  if (cached) {
+    console.log('using bazaar index cached by collect')
+    return cached
+  }
+  const url = bazaarIndexURL(now)
   try {
-    return parseBazaarIndex(await fetchJSON(bazaarIndexURL(now)))
+    return parseBazaarIndex(await fetchJSON(url))
   } catch (error) {
-    console.warn('fetch bazaar index failed:', error)
-    return undefined
+    const reason = error instanceof Error ? error.message : String(error)
+    throw new Error(`集市索引不可用，无法确定在架包集合：GET ${url} -> ${reason}`)
   }
 }
 
@@ -102,35 +104,26 @@ async function loadCatalogSafe(now: number): Promise<Catalog | undefined> {
   }
 }
 
-function lastTimestamp(histories: Record<string, PackageHistoryPoint[]>): number {
-  let latest = 0
-  for (const points of Object.values(histories)) {
-    const last = points.at(-1)
-    if (last && last.t > latest) {
-      latest = last.t
-    }
-  }
-  return latest
-}
-
 function toSummary(
   name: string,
   stats: PackageStats,
   catalog: Catalog | undefined,
+  repo: string,
   history: PackageHistoryPoint[],
   publishedAt: number,
 ): SummaryPackage {
   const meta = catalog?.packages[name]
   const baseline = pointAtOrBefore(history, publishedAt - DAY) ?? history[0]
   const rating = ratingFromStats(stats)
+  const iconURL = catalogIconURL(meta)
   return {
     name,
     type: meta?.type,
-    repo: meta?.repo ?? '',
+    repo,
     author: unescapeHtml(meta?.author ?? ''),
     displayName: catalogDisplayName(meta, name),
     description: catalogDescription(meta),
-    ...(catalogIconURL(meta) ? { iconURL: catalogIconURL(meta) } : {}),
+    ...(iconURL ? { iconURL } : {}),
     downloads: stats.d,
     ...(rating ? { rating } : {}),
     downloadDelta24h: stats.d - (baseline?.d ?? stats.d),

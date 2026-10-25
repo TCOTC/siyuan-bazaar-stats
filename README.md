@@ -11,10 +11,13 @@
 
 ## 数据
 
-- `data/snapshots/*.jsonl`：GitHub 仓库中公开的原始快照，每次集市 `publishedAt` 变化即追加一行；每月首行含 `"full": true`，为该月全量。
-- `/data/summary.json`、`/data/packages/*.json`：构建产物（不在仓库中，由 `pnpm build-data` 生成并随站点发布），包含当前数值、重建的历史曲线与最近 48 点 sparkline。
+- `data/snapshots/*.jsonl`：GitHub 仓库中公开的原始快照，每次集市 `publishedAt` 变化即追加一行；每天第一个发生变化的快照带 `"full": true`，为该日全量，其余为增量。
+- `/data/summary.json`、`/data/packages/*.json`：构建产物（不在仓库中，由 `pnpm build-data` 生成并随站点发布），包含当前数值、重建的历史曲线与最近 48 点 sparkline。两者的顶层 `schema` 为格式版本，字段或语义有变时递增。
+- 包名可能含空格或 `+`（如 `Cliff Dark`、`Dark+`），拼接详情文件 URL 时必须 `encodeURIComponent`。包下架后对应详情文件不再存在，请求返回 `404`。
 - 历史由快照增量重建，快照缺失的区间为沿用值而非真实观测；请以各点的时间戳 `t`（Unix 秒）为准，不要假设采样间隔均匀。
 - `/data/summary.json` 已包含全部包的当前数值与 sparkline，通常不必逐包拉取详情文件。
+
+第三方依赖的字段、语义与地址已冻结，完整说明见 [docs/data-contract.md](docs/data-contract.md)。
 
 ## 许可
 

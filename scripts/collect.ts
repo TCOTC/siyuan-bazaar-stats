@@ -6,10 +6,14 @@ import { diffStats, lastFullTimestamp, replayPackages, shouldWriteFullSnapshot, 
 import { parseBazaarIndex, indexToStats } from '../src/lib/parse-index.ts'
 import { dehydratePackages } from '../src/lib/rating.ts'
 import type { SnapshotFile } from '../src/lib/types.ts'
+import { writeIndexCache } from './index-cache.ts'
 import { DATA_DIR, fetchJSON, loadSnapshots } from './io.ts'
 
 export async function collect(now = Date.now()): Promise<{ changed: boolean, snapshot?: SnapshotFile }> {
-  const index = parseBazaarIndex(await fetchJSON(bazaarIndexURL(now)))
+  const raw = await fetchJSON(bazaarIndexURL(now))
+  const index = parseBazaarIndex(raw)
+  // 同一次工作流的 build-data 会复用这份索引，不再重复请求上游。
+  await writeIndexCache(raw)
   const nextStats = indexToStats(index)
   const snapshots = await loadSnapshots()
   const previous = replayPackages(snapshots)

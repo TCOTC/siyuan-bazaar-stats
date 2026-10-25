@@ -1,4 +1,3 @@
-import { unescapeHtml } from '../src/lib/locale.ts'
 import { parseBazaarHash, parseStageUpdated } from '../src/lib/catalog-view.ts'
 import { bazaarStageURL, RHY_VERSION_URL, USER_AGENT } from '../src/lib/constants.ts'
 import { isValidBazaarRepo, isValidPackageName } from '../src/lib/names.ts'
@@ -96,7 +95,7 @@ function mergeStage(
       type,
       repo: repoName,
       ...(repoHash ? { repoHash } : {}),
-      author: typeof pkg.author === 'string' ? unescapeHtml(pkg.author) : '',
+      author: typeof pkg.author === 'string' ? pkg.author : '',
       displayName: asLocaleStrings(pkg.displayName),
       description: asLocaleStrings(pkg.description),
       ...(updatedAt ? { updatedAt } : {}),
@@ -111,7 +110,8 @@ function asLocaleStrings(value: unknown): LocaleStrings {
   const result: LocaleStrings = {}
   for (const [key, text] of Object.entries(value as Record<string, unknown>)) {
     if (typeof text === 'string' && text.trim()) {
-      result[key] = unescapeHtml(text)
+      // 保留原始文本（含 HTML 实体），由 `pickLocale` 在展示层统一反转义一次。
+      result[key] = text
     }
   }
   return result

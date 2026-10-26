@@ -44,10 +44,28 @@ jobs:
           git add data
           if git diff --cached --quiet; then
             echo "No data changes"
-          else
-            git commit -m "chore: snapshot bazaar stats"
-            git push origin HEAD
+            exit 0
           fi
+          git commit -m "chore: snapshot bazaar stats"
+
+          # GitHub 偶发返回 500（remote rejected: Internal Server Error）会让 push 失败，
+          # 这里最多重试 3 次；重试前先 rebase 到远端，避免 non-fast-forward。
+          for attempt in 1 2 3; do
+            if git push origin HEAD; then
+              echo "Pushed on attempt ${attempt}"
+              exit 0
+            fi
+            echo "::warning::push failed on attempt ${attempt}"
+            if [ "${attempt}" -lt 3 ]; then
+              sleep $((attempt * 10))
+              if ! git pull --rebase --autostash origin main; then
+                git rebase --abort || true
+                echo "::warning::rebase failed, will retry push without it"
+              fi
+            fi
+          done
+          echo "::error::failed to push snapshots after 3 attempts"
+          exit 1
 
       - run: pnpm test
 
